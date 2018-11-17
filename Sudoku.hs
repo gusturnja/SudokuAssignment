@@ -1,9 +1,12 @@
 --
 import Data.List
 import Data.Char
+import Test.QuickCheck
 
 data Sudoku = Sudoku { rows :: [[Maybe Int]] }
               deriving Show
+
+type Block = [Maybe Int]
 
 mkDigit :: Int -> Maybe Int
 mkDigit x
@@ -29,22 +32,6 @@ example =
 
 row1 :: [Maybe Int]
 row1 = [Just 1, Just 2, Just 3, Just 4, Just 5, Just 6, Just 7, Just 8, Just 9]
-
--- | Check a list of cells for any repeated integers, repeated nothings are allowed
-noRepeatingValues :: [Maybe Int] -> Bool
-noRepeatingValues r = noRepeatingValues' r []
-
--- | Helper function for noRepeatingValues
-noRepeatingValues' :: [Maybe Int] -> [Int] -> Bool
-noRepeatingValues' [] _ = True --No repeating values have been found
-noRepeatingValues' (Nothing:xs) found = noRepeatingValues' xs found --ignore Nothings as they can be repeated
-noRepeatingValues' ((Just x):xs) found
-  | x `elem` found = False --If value has already been added to the list of found values, the value has been repeated
-  | otherwise      = noRepeatingValues' xs (x:found)
-
--- | Checks to see if a valid row or column contains all possible digits with no repeats or nothings
-rowFilled :: [Maybe Int] -> Bool
-rowFilled r = noRepeatingValues r && checkRowValid r && noBlanksInRow r
 
 -- PART A1 ---------------------------------------------------------------------
 
@@ -138,13 +125,36 @@ parseToSudoku [] = []
 parseToSudoku (x:xs) = parseToRow x : parseToSudoku xs
 
 readSudoku :: FilePath -> IO Sudoku
-readSodoku fp = do
+readSudoku fp = do
   contents <- readFile fp
   let r = lines contents
   return (Sudoku (parseToSudoku r))
 
 -- PART C1 ---------------------------------------------------------------------
 
+cell :: Gen (Maybe Int)
+cell = frequency [(1,rNumeric),(9,return Nothing)]
+
+rNumeric :: Gen (Maybe Int)
+rNumeric = elements [Just n|n<-[1..9]]
+
+instance Arbitrary Sudoku where
+  arbitrary =
+    do rows <- vectorOf 9 (vectorOf 9 cell)
+       return (Sudoku rows)
+
+prop_Sudoku :: Sudoku -> Bool
+prop_Sudoku s = isSudoku s
+
+-- PART D1 ---------------------------------------------------------------------
+
+isOkayBlock :: Block -> Bool
+isOkayBlock b = length (cells) == length (nub (cells))
+  where cells = filter (/= Nothing) b --remove all the Nothing values as they are allowed to be repeated
+
+blocks :: Sudoku -> [Block]
+blocks s = r ++ (transpose r)
+  where r = rows s
 
 -- | GETTERS
 
@@ -163,14 +173,7 @@ getColumn' s x index
 getValue :: Sudoku -> Int -> Int -> Maybe Int
 getValue s c r = (getRow s r) !! c
 
--- | Converts a sudoku from a list of rows to a list of columns (can be used for checking the validity of all rows)
-convertToColumns :: Sudoku -> Sudoku
-convertToColumns s = Sudoku (convertToColumns' s 0)
 
-convertToColumns' :: Sudoku -> Int -> [[Maybe Int]]
-convertToColumns' s index
-  | index > 8 = []
-  | otherwise = (getColumn s index) : (convertToColumns' s (index + 1))
 
 -- | PRINTING FUNCTIONS
 
