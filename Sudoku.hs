@@ -156,6 +156,28 @@ blocks :: Sudoku -> [Block]
 blocks s = r ++ (transpose r)
   where r = rows s
 
+doSomething :: Sudoku -> [[Maybe Int]]
+doSomething s = joinBlocks a : joinBlocks b : joinBlocks c --a, b and c are each three rows
+  where (a,b,c) = seperateIntoThreeRows s
+
+joinBlocks :: [[Maybe Int]] -> [[Maybe Int]]
+joinBlocks r = (a:a1:a2) : (b:b1:b2) : (c:c1:cs)
+  where (a,b,c) = seperateRowIntoThree (r !! 0)
+        (a1,b1,c1) = seperateRowIntoThree (r !! 1)
+        (a2,b2,c2) = seperateRowIntoThree (r !! 2)
+
+seperateIntoThreeRows :: Sudoku -> ([[Maybe Int]],[[Maybe Int]],[[Maybe Int]])
+seperateIntoThreeRows s = (a,b,c)
+  where (a,x) = splitAt 3 (rows s)
+        (b,y) = splitAt 3 x
+        (c,z) = splitAt 3 y
+
+seperateRowIntoThree :: [Maybe Int] -> ([Maybe Int], [Maybe Int], [Maybe Int])
+seperateRowIntoThree r = (a,b,c)
+  where (a,x) = splitAt 3 r
+        (b,y) = splitAt 3 x
+        (c,z) = splitAt 3 y
+
 -- | GETTERS
 
 -- | Returns a colum at a specified index
