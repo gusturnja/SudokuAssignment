@@ -31,7 +31,7 @@ example =
     j = Just
 
 row1 :: [Maybe Int]
-row1 = [Just 1, Just 2, Just 3, Just 4, Just 5, Just 6, Just 7, Just 8, Just 9]
+row1 = [Just 1, Nothing, Just 3, Just 4, Just 5, Nothing, Just 7, Just 8, Just 9]
 
 -- PART A1 ---------------------------------------------------------------------
 
@@ -184,24 +184,32 @@ prop_block_lengths :: Sudoku -> Bool
 prop_block_lengths s = (length (blocks s)) == 3*9
 -- and test that each block is 9 cells long
 
-
 isOkay :: Sudoku -> Bool
 isOkay s = and [ isOkayBlock x | x <- b ]
   where b = blocks s
 
+-- PART E ----------------------------------------------------------------------
 
+type Pos = (Int,Int)
 
+-- | Returns the value within a specified cell
+getValue :: Sudoku -> Pos -> Maybe Int
+getValue s (c,r) = (getRow s r) !! c
 
+blanks :: Sudoku -> [Pos]
+blanks s = zip (checkAllForNothing c) (checkAllForNothing r) 
+  where r = rows s
+        c = transpose r
 
+checkAllForNothing :: [[Maybe Int]] -> [Int]
+checkAllForNothing [] = []
+checkAllForNothing (x:xs) = checkRowForNothing x ++ checkAllForNothing xs
 
-
-
-
-
-
-
-
-
+checkRowForNothing :: [Maybe Int] -> [Int]
+checkRowForNothing [] = []
+checkRowForNothing (x:xs)
+  | x == Nothing = (8 - (length xs)) : checkRowForNothing xs
+  | otherwise    = checkRowForNothing xs
 
 
 
@@ -225,9 +233,7 @@ getColumn' s x index
  | otherwise = ((getRow s index) !! x) : getColumn' s x (index + 1)
  where r = rows s
 
--- | Returns the value within a specified cell
-getValue :: Sudoku -> Int -> Int -> Maybe Int
-getValue s c r = (getRow s r) !! c
+
 
 
 
