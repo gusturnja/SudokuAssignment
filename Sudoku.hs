@@ -153,18 +153,12 @@ isOkayBlock b = length (cells) == length (nub (cells))
   where cells = filter (/= Nothing) b --remove all the Nothing values as they are allowed to be repeated
 
 blocks :: Sudoku -> [Block]
-blocks s = r ++ (transpose r)
+blocks s = r ++ (transpose r) ++ (getBlocks s)
   where r = rows s
 
-doSomething :: Sudoku -> [[Maybe Int]]
-doSomething s = joinBlocks a : joinBlocks b : joinBlocks c --a, b and c are each three rows
+getBlocks :: Sudoku -> [[Maybe Int]]
+getBlocks s = (joinBlocks a) ++ (joinBlocks b) ++ (joinBlocks c) --a, b and c are each three rows
   where (a,b,c) = seperateIntoThreeRows s
-
-joinBlocks :: [[Maybe Int]] -> [[Maybe Int]]
-joinBlocks r = (a:a1:a2) : (b:b1:b2) : (c:c1:cs)
-  where (a,b,c) = seperateRowIntoThree (r !! 0)
-        (a1,b1,c1) = seperateRowIntoThree (r !! 1)
-        (a2,b2,c2) = seperateRowIntoThree (r !! 2)
 
 seperateIntoThreeRows :: Sudoku -> ([[Maybe Int]],[[Maybe Int]],[[Maybe Int]])
 seperateIntoThreeRows s = (a,b,c)
@@ -172,11 +166,51 @@ seperateIntoThreeRows s = (a,b,c)
         (b,y) = splitAt 3 x
         (c,z) = splitAt 3 y
 
+joinBlocks :: [[Maybe Int]] -> [[Maybe Int]]
+joinBlocks r = [(a++a1++a2),(b++b1++b2),(c++c1++c2)]
+  where (a,b,c) = seperateRowIntoThree (r !! 0)
+        (a1,b1,c1) = seperateRowIntoThree (r !! 1)
+        (a2,b2,c2) = seperateRowIntoThree (r !! 2)
+
+--possibly create instance of splitting the row
+
 seperateRowIntoThree :: [Maybe Int] -> ([Maybe Int], [Maybe Int], [Maybe Int])
 seperateRowIntoThree r = (a,b,c)
   where (a,x) = splitAt 3 r
         (b,y) = splitAt 3 x
         (c,z) = splitAt 3 y
+
+prop_block_lengths :: Sudoku -> Bool
+prop_block_lengths s = (length (blocks s)) == 3*9
+-- and test that each block is 9 cells long
+
+
+isOkay :: Sudoku -> Bool
+isOkay s = and [ isOkayBlock x | x <- b ]
+  where b = blocks s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- | GETTERS
 
