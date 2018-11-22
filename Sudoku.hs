@@ -197,7 +197,7 @@ getValue :: Sudoku -> Pos -> Maybe Int
 getValue s (c,r) = (getRow s r) !! c
 
 blanks :: Sudoku -> [Pos]
-blanks s = zip (checkAllForNothing c) (checkAllForNothing r) 
+blanks s = zip (checkAllForNothing r) (sort (checkAllForNothing c))
   where r = rows s
         c = transpose r
 
@@ -211,7 +211,7 @@ checkRowForNothing (x:xs)
   | x == Nothing = (8 - (length xs)) : checkRowForNothing xs
   | otherwise    = checkRowForNothing xs
 
-
+-- PART F ----------------------------------------------------------------------
 
 
 
