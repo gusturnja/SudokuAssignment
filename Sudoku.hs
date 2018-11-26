@@ -9,6 +9,8 @@ data Sudoku = Sudoku { rows :: [[Maybe Int]] }
 
 type Block = [Maybe Int]
 
+type Pos = (Int,Int)
+
 example :: Sudoku
 example =
     Sudoku
@@ -165,8 +167,6 @@ isOkay :: Sudoku -> Bool
 isOkay s = and (map isOkayBlock (blocks s))
 
 -- PART E ----------------------------------------------------------------------
-
-type Pos = (Int,Int)
 
 -- | Returns the value within a specified cell
 getValue :: Sudoku -> Pos -> Maybe Int
