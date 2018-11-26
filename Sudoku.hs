@@ -47,11 +47,11 @@ checkCell (Just x) = x `elem` [1..9]
 
 -- | Checks if all rows in the sudoku are valid (contain 9 cells and each cell is either a valid integer or nothing)
 checkAllRowsValid :: Sudoku -> Bool
-checkAllRowsValid s = and (map checkRowValid (rows s))
+checkAllRowsValid s = all checkRowValid (rows s)
 
 -- | Checks a single row if it is valid (contain 9 cells and each cell is either a valid integer or nothing with no repeating integers)
 checkRowValid :: [Maybe Int] -> Bool
-checkRowValid r = length r == 9 && and (map checkCell r)
+checkRowValid r = length r == 9 && all checkCell r
 
 -- | Checks whether a given sudoku is valid (has 9 rows and 9 columns and each cell is either Nothing or an Integer from 1 to 9)
 isSudoku :: Sudoku -> Bool
@@ -65,15 +65,10 @@ noBlanksInRow r = null [ x  | x <- r, isNothing x]
 
 -- | Checks all rows for blank cells
 isFilled :: Sudoku -> Bool
-isFilled s = and (map noBlanksInRow r)
+isFilled s = all noBlanksInRow r
   where r = rows s
 
 -- PART B1 ---------------------------------------------------------------------
-
--- | Returns a row at a specified index
-getRow :: Sudoku -> Int -> [Maybe Int]
-getRow s x = r !! x
-  where r = rows s
 
 -- | Converts a row to a printable string
 rowToString :: [Maybe Int] -> String
@@ -154,7 +149,7 @@ splitInto3 r = (l,m,n)
 
 
 prop_block_lengths :: Sudoku -> Bool
-prop_block_lengths s = length b == 3*9 && and (map prop_row_length b)
+prop_block_lengths s = length b == 3*9 && all prop_row_length b
   where b = blocks s
 
 prop_row_length :: Block -> Bool
@@ -164,13 +159,18 @@ prop_row_length b = length b == 9
 
 -- | Check all blocks in a sudoku are valid (contain no repeating values)
 isOkay :: Sudoku -> Bool
-isOkay s = and (map isOkayBlock (blocks s))
+isOkay s = all isOkayBlock (blocks s)
 
 -- PART E ----------------------------------------------------------------------
 
+-- | Returns a row at a specified index
+getRow :: Sudoku -> Int -> [Maybe Int]
+getRow s x = r !! x
+  where r = rows s
+
 -- | Returns the value within a specified cell
 getValue :: Sudoku -> Pos -> Maybe Int
-getValue s (c,r) = (getRow s r) !! c
+getValue s (c,r) = getRow s r !! c
 
 -- | Identifies the location of all the blanks in the sudoku puzzle
 blanks :: Sudoku -> [Pos]
@@ -187,7 +187,7 @@ checkAllForNothing (x:xs) = foldr ((++) . checkRowForNothing) [] xs
 checkRowForNothing :: [Maybe Int] -> [Int]
 checkRowForNothing [] = []
 checkRowForNothing (x:xs)
-  | isNothing x = (8 - (length xs)) : checkRowForNothing xs
+  | isNothing x = (8 - length xs) : checkRowForNothing xs
   | otherwise    = checkRowForNothing xs
 
 
