@@ -5,14 +5,9 @@ import Data.Maybe
 import Test.QuickCheck
 
 data Sudoku = Sudoku { rows :: [[Maybe Int]] }
-              deriving Show
+            deriving Show
 
 type Block = [Maybe Int]
-
-mkDigit :: Int -> Maybe Int
-mkDigit x
-  | x `elem` [1..9] = Just x  --Can either be a number from 1 to 9 ...
-  | otherwise       = Nothing -- ... or nothing. Any value outside of 1 to 9 defaults to nothing
 
 example :: Sudoku
 example =
@@ -31,6 +26,7 @@ example =
     n = Nothing
     j = Just
 
+-- | USED FOR TESTING
 row1 :: [Maybe Int]
 row1 = [Just 1, Nothing, Just 3, Just 4, Just 5, Nothing, Just 7, Just 8, Just 9]
 
@@ -49,17 +45,15 @@ checkCell (Just x) = x `elem` [1..9]
 
 -- | Checks if all rows in the sudoku are valid (contain 9 cells and each cell is either a valid integer or nothing)
 checkAllRowsValid :: Sudoku -> Bool
-checkAllRowsValid s = and [ checkRowValid x | x <- r ]
-  where r = rows s
+checkAllRowsValid s = and (map checkRowValid (rows s))
 
 -- | Checks a single row if it is valid (contain 9 cells and each cell is either a valid integer or nothing with no repeating integers)
 checkRowValid :: [Maybe Int] -> Bool
-checkRowValid r = length r == 9 && and [ checkCell x | x <- r ]
+checkRowValid r = length r == 9 && and (map checkCell r)
 
 -- | Checks whether a given sudoku is valid (has 9 rows and 9 columns and each cell is either Nothing or an Integer from 1 to 9)
 isSudoku :: Sudoku -> Bool
-isSudoku s = checkAllRowsValid s && length r == 9
-  where r = rows s
+isSudoku s = checkAllRowsValid s && length (rows s) == 9
 
 -- PART A3 ---------------------------------------------------------------------
 
@@ -69,7 +63,7 @@ noBlanksInRow r = null [ x  | x <- r, isNothing x]
 
 -- | Checks all rows for blank cells
 isFilled :: Sudoku -> Bool
-isFilled s = and [ noBlanksInRow x | x <- r ]
+isFilled s = and (map noBlanksInRow r)
   where r = rows s
 
 -- PART B1 ---------------------------------------------------------------------
@@ -85,46 +79,20 @@ rowToString []           = ""
 rowToString (Nothing:rs) = "." ++ rowToString rs
 rowToString (Just x:rs)  = show x ++ rowToString rs
 
--- | Converts a row to a printable string
-rowToStringAlt :: [Maybe Int] -> String
-rowToStringAlt []           = ""
-rowToStringAlt (Nothing:rs) = " . " ++ rowToStringAlt rs
-rowToStringAlt (Just x:rs)  = " " ++ show x ++ " " ++ rowToStringAlt rs
-
 -- | Print entire Sudoku
 printSudoku :: Sudoku -> IO()
-printSudoku s = printSudoku' s 0
-
--- | Helper function to printSudoku. Prints one row at a time starting at a specified row index.
-printSudoku' :: Sudoku -> Int -> IO()
-printSudoku' s index
-  | index > 8 = return ()
-  | otherwise = do putStrLn (rowToString (getRow s index))
-                   printSudoku' s (index+1)
-
--- | Print entire Sudoku using the alternate row to string function as I find that easier to read
-printSudokuAlt :: Sudoku -> IO()
-printSudokuAlt s = printSudokuAlt' s 0
-
--- | Helper function to printSudoku. Prints one row at a time starting at a specified row index.
-printSudokuAlt' :: Sudoku -> Int -> IO()
-printSudokuAlt' s index
- | index > 8 = return ()
- | otherwise = do putStrLn (rowToStringAlt (getRow s index))
-                  printSudokuAlt' s (index+1)
+printSudoku s = putStrLn (unlines (map rowToString (rows s)))
 
 -- PART B2 ---------------------------------------------------------------------
 
+-- | Transfer a given string into a valid sudoku row
 parseToRow :: String -> [Maybe Int]
 parseToRow [] = []
 parseToRow (x:xs)
   | x /= '.'  = Just (digitToInt x) : parseToRow xs
   | otherwise = Nothing : parseToRow xs
 
-parseToSudoku :: [String] -> [[Maybe Int]]
-parseToSudoku [] = []
-parseToSudoku xs = map parseToRow xs
-
+-- | Read a sudoku from a given filepath
 readSudoku :: FilePath -> IO Sudoku
 readSudoku fp = do
   contents <- readFile fp
@@ -139,55 +107,62 @@ cell = frequency [(1,rNumeric),(9,return Nothing)]
 rNumeric :: Gen (Maybe Int)
 rNumeric = elements [Just n|n<-[1..9]]
 
+-- PART C2 ---------------------------------------------------------------------
+
 instance Arbitrary Sudoku where
   arbitrary =
     do rows <- vectorOf 9 (vectorOf 9 cell)
        return (Sudoku rows)
+
+-- PART C3 ---------------------------------------------------------------------
 
 prop_Sudoku :: Sudoku -> Bool
 prop_Sudoku = isSudoku
 
 -- PART D1 ---------------------------------------------------------------------
 
+-- | Returns true if there are no repeating digits in a block (repeated Nothings are ok) or False if there are repeated values
 isOkayBlock :: Block -> Bool
 isOkayBlock b = length cells == length (nub cells)
   where cells = filter (/= Nothing) b --remove all the Nothing values as they are allowed to be repeated
 
+-- PART D2 ---------------------------------------------------------------------
+
+-- | Generate a list of all of the rows, columns and blocks in a sudoku
 blocks :: Sudoku -> [Block]
 blocks s = r ++ transpose r ++ getBlocks s
   where r = rows s
 
+-- | Split a sudoku into its 9 3*3 blocks
 getBlocks :: Sudoku -> [[Maybe Int]]
-getBlocks s = joinBlocks a ++ joinBlocks b ++ joinBlocks c --a, b and c are each three rows
-  where (a,b,c) = seperateIntoThreeRows s
+getBlocks s = join a ++ join b ++ join c --a, b and c are each three rows
+  where (a,b,c) = splitInto3 (rows s)
+        join :: [[Maybe Int]] -> [[Maybe Int]]
+        join r = [a++a1++a2,b++b1++b2,c++c1++c2]
+          where (a,b,c)    = splitInto3 (head r)
+                (a1,b1,c1) = splitInto3 (r !! 1)
+                (a2,b2,c2) = splitInto3 (r !! 2)
 
-seperateIntoThreeRows :: Sudoku -> ([[Maybe Int]],[[Maybe Int]],[[Maybe Int]])
-seperateIntoThreeRows s = (a,b,c)
-  where (a,x) = splitAt 3 (rows s)
-        (b,y) = splitAt 3 x
-        (c,z) = splitAt 3 y
+-- | Splits a list into 3 even lists
+splitInto3 :: [a] -> ([a],[a],[a])
+splitInto3 r = (l,m,n)
+  where (l,x) = splitAt 3 r
+        (m,y) = splitAt 3 x
+        (n,z) = splitAt 3 y
 
-joinBlocks :: [[Maybe Int]] -> [[Maybe Int]]
-joinBlocks r = [a++a1++a2,b++b1++b2,c++c1++c2]
-  where (a,b,c) = seperateRowIntoThree (head r)
-        (a1,b1,c1) = seperateRowIntoThree (r !! 1)
-        (a2,b2,c2) = seperateRowIntoThree (r !! 2)
-
---possibly create instance of splitting the row
-
-seperateRowIntoThree :: [Maybe Int] -> ([Maybe Int], [Maybe Int], [Maybe Int])
-seperateRowIntoThree r = (a,b,c)
-  where (a,x) = splitAt 3 r
-        (b,y) = splitAt 3 x
-        (c,z) = splitAt 3 y
 
 prop_block_lengths :: Sudoku -> Bool
-prop_block_lengths s = length (blocks s) == 3*9
--- and test that each block is 9 cells long
-
-isOkay :: Sudoku -> Bool
-isOkay s = and [ isOkayBlock x | x <- b ]
+prop_block_lengths s = length b == 3*9 && and (map prop_row_length b)
   where b = blocks s
+
+prop_row_length :: Block -> Bool
+prop_row_length b = length b == 9
+
+-- PART D3 ---------------------------------------------------------------------
+
+-- | Check all blocks in a sudoku are valid (contain no repeating values)
+isOkay :: Sudoku -> Bool
+isOkay s = and (map isOkayBlock (blocks s))
 
 -- PART E ----------------------------------------------------------------------
 
@@ -197,22 +172,23 @@ type Pos = (Int,Int)
 getValue :: Sudoku -> Pos -> Maybe Int
 getValue s (c,r) = (getRow s r) !! c
 
+-- | Identifies the location of all the blanks in the sudoku puzzle
 blanks :: Sudoku -> [Pos]
 blanks s = zip (checkAllForNothing r) (sort (checkAllForNothing c))
   where r = rows s
         c = transpose r
 
+-- | Check a given list of rows/columns for the location of the blanks, returning a list of all the indexes found
 checkAllForNothing :: [[Maybe Int]] -> [Int]
 checkAllForNothing [] = []
 checkAllForNothing (x:xs) = foldr ((++) . checkRowForNothing) [] xs
 
+-- | Check an individual row/column for blanks and return a list of their indexes
 checkRowForNothing :: [Maybe Int] -> [Int]
 checkRowForNothing [] = []
 checkRowForNothing (x:xs)
   | isNothing x = (8 - (length xs)) : checkRowForNothing xs
   | otherwise    = checkRowForNothing xs
-
-
 
 
 -- PART F ----------------------------------------------------------------------
