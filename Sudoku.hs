@@ -1,6 +1,7 @@
 --
 import Data.List
 import Data.Char
+import Data.Maybe
 import Test.QuickCheck
 
 data Sudoku = Sudoku { rows :: [[Maybe Int]] }
@@ -64,7 +65,7 @@ isSudoku s = checkAllRowsValid s && length r == 9
 
 -- | Checks if theres blanks within a given row
 noBlanksInRow :: [Maybe Int] -> Bool
-noBlanksInRow r = [ x  | x <- r,  x == Nothing] == []
+noBlanksInRow r = null [ x  | x <- r, isNothing x]
 
 -- | Checks all rows for blank cells
 isFilled :: Sudoku -> Bool
@@ -81,14 +82,14 @@ getRow s x = r !! x
 -- | Converts a row to a printable string
 rowToString :: [Maybe Int] -> String
 rowToString []           = ""
-rowToString (Nothing:rs) = "." ++ (rowToString rs)
-rowToString (Just x:rs)  = (show x) ++ (rowToString rs)
+rowToString (Nothing:rs) = "." ++ rowToString rs
+rowToString (Just x:rs)  = show x ++ rowToString rs
 
 -- | Converts a row to a printable string
 rowToStringAlt :: [Maybe Int] -> String
 rowToStringAlt []           = ""
-rowToStringAlt (Nothing:rs) = " . " ++ (rowToStringAlt rs)
-rowToStringAlt (Just x:rs)  = " " ++ (show x) ++ " " ++ (rowToStringAlt rs)
+rowToStringAlt (Nothing:rs) = " . " ++ rowToStringAlt rs
+rowToStringAlt (Just x:rs)  = " " ++ show x ++ " " ++ rowToStringAlt rs
 
 -- | Print entire Sudoku
 printSudoku :: Sudoku -> IO()
@@ -114,7 +115,7 @@ printSudokuAlt' s index
 
 -- PART B2 ---------------------------------------------------------------------
 
-parseToRow :: [Char] -> [Maybe Int]
+parseToRow :: String -> [Maybe Int]
 parseToRow [] = []
 parseToRow (x:xs)
   | x /= '.'  = Just (digitToInt x) : parseToRow xs
@@ -122,13 +123,13 @@ parseToRow (x:xs)
 
 parseToSudoku :: [String] -> [[Maybe Int]]
 parseToSudoku [] = []
-parseToSudoku (x:xs) = parseToRow x : parseToSudoku xs
+parseToSudoku xs = map parseToRow xs
 
 readSudoku :: FilePath -> IO Sudoku
 readSudoku fp = do
   contents <- readFile fp
   let r = lines contents
-  return (Sudoku (parseToSudoku r))
+  return (Sudoku (map parseToRow r))
 
 -- PART C1 ---------------------------------------------------------------------
 
@@ -144,20 +145,20 @@ instance Arbitrary Sudoku where
        return (Sudoku rows)
 
 prop_Sudoku :: Sudoku -> Bool
-prop_Sudoku s = isSudoku s
+prop_Sudoku = isSudoku
 
 -- PART D1 ---------------------------------------------------------------------
 
 isOkayBlock :: Block -> Bool
-isOkayBlock b = length (cells) == length (nub (cells))
+isOkayBlock b = length cells == length (nub cells)
   where cells = filter (/= Nothing) b --remove all the Nothing values as they are allowed to be repeated
 
 blocks :: Sudoku -> [Block]
-blocks s = r ++ (transpose r) ++ (getBlocks s)
+blocks s = r ++ transpose r ++ getBlocks s
   where r = rows s
 
 getBlocks :: Sudoku -> [[Maybe Int]]
-getBlocks s = (joinBlocks a) ++ (joinBlocks b) ++ (joinBlocks c) --a, b and c are each three rows
+getBlocks s = joinBlocks a ++ joinBlocks b ++ joinBlocks c --a, b and c are each three rows
   where (a,b,c) = seperateIntoThreeRows s
 
 seperateIntoThreeRows :: Sudoku -> ([[Maybe Int]],[[Maybe Int]],[[Maybe Int]])
@@ -167,8 +168,8 @@ seperateIntoThreeRows s = (a,b,c)
         (c,z) = splitAt 3 y
 
 joinBlocks :: [[Maybe Int]] -> [[Maybe Int]]
-joinBlocks r = [(a++a1++a2),(b++b1++b2),(c++c1++c2)]
-  where (a,b,c) = seperateRowIntoThree (r !! 0)
+joinBlocks r = [a++a1++a2,b++b1++b2,c++c1++c2]
+  where (a,b,c) = seperateRowIntoThree (head r)
         (a1,b1,c1) = seperateRowIntoThree (r !! 1)
         (a2,b2,c2) = seperateRowIntoThree (r !! 2)
 
@@ -181,7 +182,7 @@ seperateRowIntoThree r = (a,b,c)
         (c,z) = splitAt 3 y
 
 prop_block_lengths :: Sudoku -> Bool
-prop_block_lengths s = (length (blocks s)) == 3*9
+prop_block_lengths s = length (blocks s) == 3*9
 -- and test that each block is 9 cells long
 
 isOkay :: Sudoku -> Bool
@@ -203,62 +204,15 @@ blanks s = zip (checkAllForNothing r) (sort (checkAllForNothing c))
 
 checkAllForNothing :: [[Maybe Int]] -> [Int]
 checkAllForNothing [] = []
-checkAllForNothing (x:xs) = checkRowForNothing x ++ checkAllForNothing xs
+checkAllForNothing (x:xs) = foldr ((++) . checkRowForNothing) [] xs
 
 checkRowForNothing :: [Maybe Int] -> [Int]
 checkRowForNothing [] = []
 checkRowForNothing (x:xs)
-  | x == Nothing = (8 - (length xs)) : checkRowForNothing xs
+  | isNothing x = (8 - (length xs)) : checkRowForNothing xs
   | otherwise    = checkRowForNothing xs
 
+
+
+
 -- PART F ----------------------------------------------------------------------
-
-
-
-
-
-
-
-
--- | GETTERS
-
--- | Returns a colum at a specified index
-getColumn :: Sudoku -> Int -> [Maybe Int]
-getColumn s x = getColumn' s x 0
-
--- | Helper function for getColumn
-getColumn' :: Sudoku -> Int -> Int -> [Maybe Int]
-getColumn' s x index
- | index > 8 = []
- | otherwise = ((getRow s index) !! x) : getColumn' s x (index + 1)
- where r = rows s
-
-
-
-
-
--- | PRINTING FUNCTIONS
-
-
-
-columnToString :: [Maybe Int] -> String
-columnToString [] = ""
-columnToString (Nothing:rs) = "N \n" ++ columnToString rs
-columnToString (Just x:rs) = (show x) ++ "\n" ++ columnToString rs
-
-
-
-printValue :: Maybe Int -> IO()
-printValue Nothing = putStrLn "N"
-printValue (Just x) = putStrLn (show x)
-
--- | OLD FUNCTIONS
--- | Helper function for rowFilled
-rowFilled' :: [Maybe Int] -> [Int] -> Bool
-rowFilled' [] found
-  | sum found == sum [1..9] = True --If the sum of the found list is the same as the sum of the expected list, they must be the same. This presumes that the row being given is valid
-  | otherwise = False
-rowFilled' (Nothing:xs) found = False
-rowFilled' ((Just x):xs) found
-  | x `elem` found = False
-  | otherwise      = rowFilled' xs (x:found)
