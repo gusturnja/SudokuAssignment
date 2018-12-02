@@ -1,4 +1,4 @@
---
+module Sudoku where
 import Data.List
 import Data.Char
 import Data.Maybe
@@ -10,6 +10,7 @@ data Sudoku = Sudoku { rows :: [[Maybe Int]] }
 type Block = [Maybe Int]
 
 type Pos = (Int,Int)
+--column number then row number. Think along the corridor and up the stairs.
 
 example :: Sudoku
 example =
@@ -29,7 +30,7 @@ example =
     j = Just
 
 -- | USED FOR TESTING
-row1 :: [Maybe Int]
+row1 :: Block
 row1 = [Just 1, Nothing, Just 3, Just 4, Just 5, Nothing, Just 7, Just 8, Just 9]
 
 -- PART A1 ---------------------------------------------------------------------
@@ -190,5 +191,34 @@ checkRowForNothing (x:xs)
   | isNothing x = (8 - length xs) : checkRowForNothing xs
   | otherwise    = checkRowForNothing xs
 
+-- | Update a given list by replacing the item at the specified location with the new specified item
+(!!=) :: [a] -> (Int,a) -> [a]
+(!!=) [] (_,x) = [x]
+(!!=) xs (i,x) = (take i xs) ++ [x] ++ (drop (i+1) xs)
+
+-- | Update an location within a sudoku with a new specified item
+update :: Sudoku -> Pos -> Maybe Int -> Sudoku
+update s (x,y) n = Sudoku (r !!= (y , (r !! y) !!= (x,n)))
+  where r = rows s
+
+-- TODO incorporate the 3x3 block into this
+candidate :: Sudoku -> Pos -> [Int]
+candidate s (x,y) = intersect (intersect (findCandidates (r !! y)) (findCandidates ((transpose r) !! x))) (findCandidates (findBlock s (x,y)))
+  where r = rows s
+
+-- | Finds all possible value in a given block
+findCandidates :: Block -> [Int]
+findCandidates r = [ x | x <- [1..9], not (x `elem` xs) ]
+  where xs = catMaybes r
+
+findBlock :: Sudoku -> Pos -> Block
+findBlock s (x,y) = head (getThird (getThird (getBlocks s) y) x) --get the head as there should only be one item in the list
+  where getThird :: [a] -> Int -> [a]
+        getThird xs x
+          | x < 3 = take lb xs --take first third
+          | x > 5 = drop ub xs --take last third
+          | otherwise = drop lb (take ub xs) --take mid third
+          where lb = (length xs `div` 3)
+                ub = lb * 2
 
 -- PART F ----------------------------------------------------------------------
