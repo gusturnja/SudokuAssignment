@@ -173,23 +173,13 @@ getRow s x = r !! x
 getValue :: Sudoku -> Pos -> Maybe Int
 getValue s (c,r) = getRow s r !! c
 
--- | Identifies the location of all the blanks in the sudoku puzzle
 blanks :: Sudoku -> [Pos]
-blanks s = zip (checkAllForNothing r) (sort (checkAllForNothing c))
-  where r = rows s
-        c = transpose r
-
--- | Check a given list of rows/columns for the location of the blanks, returning a list of all the indexes found
-checkAllForNothing :: [[Maybe Int]] -> [Int]
-checkAllForNothing [] = []
-checkAllForNothing (x:xs) = foldr ((++) . checkRowForNothing) [] xs
-
--- | Check an individual row/column for blanks and return a list of their indexes
-checkRowForNothing :: [Maybe Int] -> [Int]
-checkRowForNothing [] = []
-checkRowForNothing (x:xs)
-  | isNothing x = (8 - length xs) : checkRowForNothing xs
-  | otherwise    = checkRowForNothing xs
+blanks (Sudoku rows) =
+  [ (colNum, rowNum)
+  | (rowNum, row) <- zip [0..] rows
+  , (colNum, cell) <- zip [0..] row
+  , isNothing cell
+  ]
 
 -- | Update a given list by replacing the item at the specified location with the new specified item
 (!!=) :: [a] -> (Int,a) -> [a]
@@ -211,6 +201,7 @@ findCandidates :: Block -> [Int]
 findCandidates r = [ x | x <- [1..9], not (x `elem` xs) ]
   where xs = catMaybes r
 
+-- | Find the block that the given position is in
 findBlock :: Sudoku -> Pos -> Block
 findBlock s (x,y) = head (getThird (getThird (getBlocks s) y) x) --get the head as there should only be one item in the list
   where getThird :: [a] -> Int -> [a]
@@ -222,3 +213,18 @@ findBlock s (x,y) = head (getThird (getThird (getBlocks s) y) x) --get the head 
                 ub = lb * 2
 
 -- PART F ----------------------------------------------------------------------
+
+solve :: Sudoku -> Maybe Sudoku
+solve s = if isSudoku s then do solve' (Just s) (blanks s) else do Nothing -- If the sudoku is valid, attempt to solve, otherwise return nothing
+
+solve' :: Maybe Sudoku -> [Pos] -> Maybe Sudoku
+solve' s [] = s --No blanks left, I have reached a potentially solved sudoku
+solve' (Just s) (p:ps) = cycleCandidates (Just s) (p:ps) (candidate s p) -- I still have blanks, I will now try to update with a candidate
+
+cycleCandidates :: Maybe Sudoku -> [Pos] -> [Int] -> Maybe Sudoku
+cycleCandidates _ _ [] = Nothing -- I have run out of possible candidates for this position
+cycleCandidates (Just s) (p:ps) (c:cs)
+  | isNothing news && cs /= [] = cycleCandidates (Just s) (p:ps) cs -- I arrived at a dead end somewhere but I have more candidates to try
+  | isNothing news && cs == [] = Nothing -- I have reached a dead end and I have no other candidates to check
+  | otherwise = news -- I have reached a solved sudoku
+  where news = solve' (Just (update s p (Just c))) ps -- attempt to solve the sudoku with this candidate
