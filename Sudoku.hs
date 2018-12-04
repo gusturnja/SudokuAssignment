@@ -5,7 +5,7 @@ import Data.Maybe
 import Test.QuickCheck
 
 data Sudoku = Sudoku { rows :: [[Maybe Int]] }
-            deriving Show
+            deriving (Show,Eq)
 
 type Block = [Maybe Int]
 
@@ -29,10 +29,6 @@ example =
     n = Nothing
     j = Just
 
--- | USED FOR TESTING
-row1 :: Block
-row1 = [Just 1, Nothing, Just 3, Just 4, Just 5, Nothing, Just 7, Just 8, Just 9]
-
 -- PART A1 ---------------------------------------------------------------------
 
 -- | Creates an entirely blank sudoku
@@ -43,59 +39,58 @@ allBlankSudoku = Sudoku (replicate 9 (replicate 9 Nothing))
 
 -- | Checks to see if a cell contains either nothing or a valid integer
 checkCell :: Maybe Int -> Bool
-checkCell Nothing = True
-checkCell (Just x) = x `elem` [1..9]
+checkCell Nothing  = True
+checkCell (Just x) = x <= 9 && x >= 1
 
 -- | Checks if all rows in the sudoku are valid (contain 9 cells and each cell is either a valid integer or nothing)
 checkAllRowsValid :: Sudoku -> Bool
-checkAllRowsValid s = all checkRowValid (rows s)
+checkAllRowsValid sud = all checkRowValid (rows sud)
 
--- | Checks a single row if it is valid (contain 9 cells and each cell is either a valid integer or nothing with no repeating integers)
-checkRowValid :: [Maybe Int] -> Bool
-checkRowValid r = length r == 9 && all checkCell r
+-- | Checks a single block if it is valid (contain 9 cells and each cell is either a valid integer or nothing with no repeating integers)
+checkRowValid :: Block -> Bool
+checkRowValid block = length block == 9 && all checkCell block
 
 -- | Checks whether a given sudoku is valid (has 9 rows and 9 columns and each cell is either Nothing or an Integer from 1 to 9)
 isSudoku :: Sudoku -> Bool
-isSudoku s = checkAllRowsValid s && length (rows s) == 9
+isSudoku sud = checkAllRowsValid sud && length (rows sud) == 9
 
 -- PART A3 ---------------------------------------------------------------------
 
--- | Checks if theres blanks within a given row
-noBlanksInRow :: [Maybe Int] -> Bool
-noBlanksInRow r = null [ x  | x <- r, isNothing x]
+-- | Returns true if there are no blanks in a given row, otherwise false
+noBlanksInRow :: Block -> Bool
+noBlanksInRow row = all isJust row
 
 -- | Checks all rows for blank cells
 isFilled :: Sudoku -> Bool
-isFilled s = all noBlanksInRow r
-  where r = rows s
+isFilled (Sudoku rows) = all noBlanksInRow rows
 
 -- PART B1 ---------------------------------------------------------------------
 
 -- | Converts a row to a printable string
-rowToString :: [Maybe Int] -> String
+rowToString :: Block -> String
 rowToString []           = ""
 rowToString (Nothing:rs) = "." ++ rowToString rs
 rowToString (Just x:rs)  = show x ++ rowToString rs
 
 -- | Print entire Sudoku
 printSudoku :: Sudoku -> IO()
-printSudoku s = putStrLn (unlines (map rowToString (rows s)))
+printSudoku sud = putStrLn (unlines (map rowToString (rows sud)))
 
 -- PART B2 ---------------------------------------------------------------------
 
 -- | Transfer a given string into a valid sudoku row
-parseToRow :: String -> [Maybe Int]
+parseToRow :: String -> Block
 parseToRow [] = []
-parseToRow (x:xs)
-  | x /= '.'  = Just (digitToInt x) : parseToRow xs
-  | otherwise = Nothing : parseToRow xs
+parseToRow (value:rs)
+  | value /= '.'  = Just (digitToInt value) : parseToRow rs
+  | otherwise     = Nothing : parseToRow rs
 
 -- | Read a sudoku from a given filepath
 readSudoku :: FilePath -> IO Sudoku
 readSudoku fp = do
   contents <- readFile fp
-  let r = lines contents
-  return (Sudoku (map parseToRow r))
+  let rows = lines contents
+  return (Sudoku (map parseToRow rows))
 
 -- PART C1 ---------------------------------------------------------------------
 
@@ -103,7 +98,7 @@ cell :: Gen (Maybe Int)
 cell = frequency [(1,rNumeric),(9,return Nothing)]
 
 rNumeric :: Gen (Maybe Int)
-rNumeric = elements [Just n|n<-[1..9]]
+rNumeric = elements [Just n| n<-[1..9]]
 
 -- PART C2 ---------------------------------------------------------------------
 
@@ -121,33 +116,32 @@ prop_Sudoku = isSudoku
 
 -- | Returns true if there are no repeating digits in a block (repeated Nothings are ok) or False if there are repeated values
 isOkayBlock :: Block -> Bool
-isOkayBlock b = length cells == length (nub cells)
-  where cells = filter (/= Nothing) b --remove all the Nothing values as they are allowed to be repeated
+isOkayBlock block = length cells == length (nub cells)
+  where cells = filter (isJust) block --remove all the Nothing values as they are allowed to be repeated
 
 -- PART D2 ---------------------------------------------------------------------
 
 -- | Generate a list of all of the rows, columns and blocks in a sudoku
 blocks :: Sudoku -> [Block]
-blocks s = r ++ transpose r ++ getBlocks s
-  where r = rows s
+blocks sud = r ++ transpose r ++ getBlocks sud
+  where r = rows sud
 
 -- | Split a sudoku into its 9 3*3 blocks
-getBlocks :: Sudoku -> [[Maybe Int]]
-getBlocks s = join a ++ join b ++ join c --a, b and c are each three rows
-  where (a,b,c) = splitInto3 (rows s)
-        join :: [[Maybe Int]] -> [[Maybe Int]]
+getBlocks :: Sudoku -> [Block]
+getBlocks sud = join a ++ join b ++ join c --a, b and c are each three rows
+  where (a,b,c) = splitInto3 (rows sud)
+        join :: [Block] -> [Block]
         join r = [a++a1++a2,b++b1++b2,c++c1++c2]
           where (a,b,c)    = splitInto3 (head r)
                 (a1,b1,c1) = splitInto3 (r !! 1)
                 (a2,b2,c2) = splitInto3 (r !! 2)
 
--- | Splits a list into 3 even lists
+-- | Splits a list of length 9 into 3 even lists
 splitInto3 :: [a] -> ([a],[a],[a])
-splitInto3 r = (l,m,n)
-  where (l,x) = splitAt 3 r
-        (m,y) = splitAt 3 x
-        (n,z) = splitAt 3 y
-
+splitInto3 r = (x1,x2,x3)
+  where (x1,y)  = splitAt third r
+        (x2,x3) = splitAt third y
+        third   = (length r) `div` 3
 
 prop_block_lengths :: Sudoku -> Bool
 prop_block_lengths s = length b == 3*9 && all prop_row_length b
@@ -173,13 +167,9 @@ getRow s x = r !! x
 getValue :: Sudoku -> Pos -> Maybe Int
 getValue s (c,r) = getRow s r !! c
 
+--Function recieved as part of 3A feedback. I did not program this myself.
 blanks :: Sudoku -> [Pos]
-blanks (Sudoku rows) =
-  [ (colNum, rowNum)
-  | (rowNum, row) <- zip [0..] rows
-  , (colNum, cell) <- zip [0..] row
-  , isNothing cell
-  ]
+blanks (Sudoku rows) =  [ (colNum, rowNum) | (rowNum, row) <- zip [0..] rows, (colNum, cell) <- zip [0..] row, isNothing cell]
 
 -- | Update a given list by replacing the item at the specified location with the new specified item
 (!!=) :: [a] -> (Int,a) -> [a]
@@ -205,26 +195,65 @@ findCandidates r = [ x | x <- [1..9], not (x `elem` xs) ]
 findBlock :: Sudoku -> Pos -> Block
 findBlock s (x,y) = head (getThird (getThird (getBlocks s) y) x) --get the head as there should only be one item in the list
   where getThird :: [a] -> Int -> [a]
-        getThird xs x
-          | x < 3 = take lb xs --take first third
-          | x > 5 = drop ub xs --take last third
-          | otherwise = drop lb (take ub xs) --take mid third
-          where lb = (length xs `div` 3)
-                ub = lb * 2
+        getThird list index
+          | index < 3 = a --take first third
+          | index > 5 = c --take last third
+          | otherwise = b --take mid third
+          where (a,b,c) = splitInto3 list
 
--- PART F ----------------------------------------------------------------------
+-- PART F1 ---------------------------------------------------------------------
 
+-- | Attempt to solve a sudoku puzzle if the sudoku is valid. This returns Nothing if there is no solution or the sudoku is invalid
 solve :: Sudoku -> Maybe Sudoku
 solve s = if isSudoku s then do solve' (Just s) (blanks s) else do Nothing -- If the sudoku is valid, attempt to solve, otherwise return nothing
 
+-- | Find candidates for a blank position in the sudoku and try to solve for that position
 solve' :: Maybe Sudoku -> [Pos] -> Maybe Sudoku
 solve' s [] = s --No blanks left, I have reached a potentially solved sudoku
 solve' (Just s) (p:ps) = cycleCandidates (Just s) (p:ps) (candidate s p) -- I still have blanks, I will now try to update with a candidate
 
+-- | Cycle through the possible candidates.
 cycleCandidates :: Maybe Sudoku -> [Pos] -> [Int] -> Maybe Sudoku
-cycleCandidates _ _ [] = Nothing -- I have run out of possible candidates for this position
+cycleCandidates _ _ [] = Nothing -- I have run out of possible candidates for this position. This is a dead end, I must backtrack
 cycleCandidates (Just s) (p:ps) (c:cs)
-  | isNothing news && cs /= [] = cycleCandidates (Just s) (p:ps) cs -- I arrived at a dead end somewhere but I have more candidates to try
-  | isNothing news && cs == [] = Nothing -- I have reached a dead end and I have no other candidates to check
-  | otherwise = news -- I have reached a solved sudoku
+  | isNothing news && cs /= [] = cycleCandidates (Just s) (p:ps) cs -- I arrived at a dead end somewhere but I have more candidates to try before this is deemed unsolvable
+  | isNothing news && cs == [] = Nothing -- I have reached a dead end and I have no other candidates to check so I backtrack further
+  | otherwise                  = news -- I have reached a solved sudoku, the solved sudoku must be passed all the way back to the top of the stack
   where news = solve' (Just (update s p (Just c))) ps -- attempt to solve the sudoku with this candidate
+
+-- PART F2 ---------------------------------------------------------------------
+
+-- | Read a sudoku from a file, solve it if possible and print the solution
+readAndSolve :: FilePath -> IO ()
+readAndSolve f = do
+                  sud <- readSudoku f
+                  let solvedSud = solve sud
+                  if isNothing solvedSud then do
+                    putStrLn "(no solution)"
+                  else do
+                    printSudoku (fromJust solvedSud)
+
+-- PART F3 ---------------------------------------------------------------------
+
+-- | Check to see if one sudoku is a solution of another
+isSolutionOf :: Sudoku -> Sudoku -> Bool
+isSolutionOf s1 s2 = isOkay s1 && isFilled s1 && checkValues (getValuesLocations (rows s2)) s1
+
+-- | Checks a list of values with their respective locations of one sudoku to see if they match the values at the same location in another sudoku
+checkValues :: [(Pos,Maybe Int)] -> Sudoku -> Bool
+checkValues [] _ = True
+checkValues ((pos,value):xs) s
+  | value == getValue s pos = checkValues xs s
+  | otherwise = False
+
+-- | Return a list of all values in a sudoku which arent nothing with their respective positions
+getValuesLocations :: [[Maybe Int]] -> [(Pos,Maybe Int)]
+getValuesLocations rows = [ ((colNum,rowNum),value) | (rowNum, row) <- (zip [0.. ] rows), (colNum,value) <- (zip [0..] row), isJust value ]
+
+-- PART F4 ---------------------------------------------------------------------
+
+prop_SolveSound :: Sudoku -> Property
+prop_SolveSound s = not (isNothing solved) ==> isSolutionOf (fromJust solved) s
+  where solved = solve s
+
+fewerChecks prop = quickCheckWith stdArgs{ maxSuccess = 2 } prop
