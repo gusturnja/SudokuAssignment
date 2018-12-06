@@ -156,7 +156,7 @@ prop_row_length b = length b == 9
 isOkay :: Sudoku -> Bool
 isOkay s = all isOkayBlock (blocks s)
 
--- PART E ----------------------------------------------------------------------
+-- PART E1 ---------------------------------------------------------------------
 
 -- | Returns a row at a specified index
 getRow :: Sudoku -> Int -> [Maybe Int]
@@ -171,19 +171,38 @@ getValue s (c,r) = getRow s r !! c
 blanks :: Sudoku -> [Pos]
 blanks (Sudoku rows) =  [ (colNum, rowNum) | (rowNum, row) <- zip [0..] rows, (colNum, cell) <- zip [0..] row, isNothing cell]
 
+prop_blanks_allBlank :: Sudoku -> Bool
+prop_blanks_allBlank sud = length b <= 81
+  where b = blanks sud
+
+-- PART E2 ---------------------------------------------------------------------
+
 -- | Update a given list by replacing the item at the specified location with the new specified item
 (!!=) :: [a] -> (Int,a) -> [a]
 (!!=) [] (_,x) = [x]
 (!!=) xs (i,x) = (take i xs) ++ [x] ++ (drop (i+1) xs)
+
+prop_bangBangEquals_correct :: NonEmptyList Int -> Int -> Bool
+prop_bangbangEquals_correct (NonEmpty xs) value = length updatedxs == length xs && (updatedxs !! index) == value
+  where updatedxs = xs !!= (index,value)
+        index = (length xs) - 1
+
+-- PART E3 ---------------------------------------------------------------------
 
 -- | Update an location within a sudoku with a new specified item
 update :: Sudoku -> Pos -> Maybe Int -> Sudoku
 update s (x,y) n = Sudoku (r !!= (y , (r !! y) !!= (x,n)))
   where r = rows s
 
+prop_update_updated :: Sudoku -> Maybe Int -> Pos -> Bool
+prop_update_updated sud value p = isSudoku updatedsud && getValue updatedsud p == value
+  where updatedsud = update sud p value
+
+-- PART E4 ---------------------------------------------------------------------
+
 -- TODO incorporate the 3x3 block into this
-candidate :: Sudoku -> Pos -> [Int]
-candidate s (x,y) = intersect (intersect (findCandidates (r !! y)) (findCandidates ((transpose r) !! x))) (findCandidates (findBlock s (x,y)))
+candidates :: Sudoku -> Pos -> [Int]
+candidates s (x,y) = intersect (intersect (findCandidates (r !! y)) (findCandidates ((transpose r) !! x))) (findCandidates (findBlock s (x,y)))
   where r = rows s
 
 -- | Finds all possible value in a given block
@@ -201,6 +220,13 @@ findBlock s (x,y) = head (getThird (getThird (getBlocks s) y) x) --get the head 
           | otherwise = b --take mid third
           where (a,b,c) = splitInto3 list
 
+prop_candidates_correct :: Sudoku -> Bool
+prop_candidates_correct sud = and [  prop_candidates_correct' (candidates sud (x,y)) | (x,y) <- (blanks sud) ]
+
+prop_candidates_correct' :: [Int] -> Bool
+prop_candidates_correct' xs = l <= 9 && l == length (nub xs)
+  where l = length xs
+
 -- PART F1 ---------------------------------------------------------------------
 
 -- | Attempt to solve a sudoku puzzle if the sudoku is valid. This returns Nothing if there is no solution or the sudoku is invalid
@@ -210,7 +236,7 @@ solve s = if isSudoku s then do solve' (Just s) (blanks s) else do Nothing -- If
 -- | Find candidates for a blank position in the sudoku and try to solve for that position
 solve' :: Maybe Sudoku -> [Pos] -> Maybe Sudoku
 solve' s [] = s --No blanks left, I have reached a potentially solved sudoku
-solve' (Just s) (p:ps) = cycleCandidates (Just s) (p:ps) (candidate s p) -- I still have blanks, I will now try to update with a candidate
+solve' (Just s) (p:ps) = cycleCandidates (Just s) (p:ps) (candidates s p) -- I still have blanks, I will now try to update with a candidate
 
 -- | Cycle through the possible candidates.
 cycleCandidates :: Maybe Sudoku -> [Pos] -> [Int] -> Maybe Sudoku
@@ -256,4 +282,4 @@ prop_SolveSound :: Sudoku -> Property
 prop_SolveSound s = not (isNothing solved) ==> isSolutionOf (fromJust solved) s
   where solved = solve s
 
-fewerChecks prop = quickCheckWith stdArgs{ maxSuccess = 2 } prop
+fewerChecks prop = quickCheckWith stdArgs{ maxSuccess = 3 } prop
