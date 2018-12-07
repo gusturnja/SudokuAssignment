@@ -183,7 +183,7 @@ prop_blanks_allBlank = length b == 81
 (!!=) xs (i,x) = (take i xs) ++ [x] ++ (drop (i+1) xs)
 
 prop_bangBangEquals_correct :: NonEmptyList Int -> Int -> Bool
-prop_bangbangEquals_correct (NonEmpty xs) value = length updatedxs == length xs && (updatedxs !! index) == value
+prop_bangBangEquals_correct (NonEmpty xs) value = length updatedxs == length xs && (updatedxs !! index) == value
   where updatedxs = xs !!= (index,value)
         index = (length xs) - 1
 
