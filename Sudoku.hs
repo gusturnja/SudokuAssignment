@@ -10,7 +10,7 @@ data Sudoku = Sudoku { rows :: [[Maybe Int]] }
 type Block = [Maybe Int]
 
 type Pos = (Int,Int)
---column number then row number. Think along the corridor and up the stairs.
+--row number, then column number.
 
 example :: Sudoku
 example =
@@ -143,8 +143,8 @@ splitInto3 r = (x1,x2,x3)
         (x2,x3) = splitAt third y
         third   = (length r) `div` 3
 
-prop_block_lengths :: Sudoku -> Bool
-prop_block_lengths s = length b == 3*9 && all prop_row_length b
+prop_blocks_lengths :: Sudoku -> Bool
+prop_blocks_lengths s = length b == 3*9 && all prop_row_length b
   where b = blocks s
 
 prop_row_length :: Block -> Bool
@@ -169,11 +169,11 @@ getValue s (c,r) = getRow s r !! c
 
 --Function recieved as part of 3A feedback. I did not program this myself.
 blanks :: Sudoku -> [Pos]
-blanks (Sudoku rows) =  [ (colNum, rowNum) | (rowNum, row) <- zip [0..] rows, (colNum, cell) <- zip [0..] row, isNothing cell]
+blanks (Sudoku rows) =  [ (rowNum, colNum) | (rowNum, row) <- zip [0..] rows, (colNum, cell) <- zip [0..] row, isNothing cell]
 
-prop_blanks_allBlank :: Sudoku -> Bool
-prop_blanks_allBlank sud = length b <= 81
-  where b = blanks sud
+prop_blanks_allBlank :: Bool
+prop_blanks_allBlank = length b == 81
+  where b = blanks allBlankSudoku
 
 -- PART E2 ---------------------------------------------------------------------
 
@@ -191,7 +191,7 @@ prop_bangbangEquals_correct (NonEmpty xs) value = length updatedxs == length xs 
 
 -- | Update an location within a sudoku with a new specified item
 update :: Sudoku -> Pos -> Maybe Int -> Sudoku
-update s (x,y) n = Sudoku (r !!= (y , (r !! y) !!= (x,n)))
+update s (y,x) n = Sudoku (r !!= (y , (r !! y) !!= (x,n)))
   where r = rows s
 
 prop_update_updated :: Sudoku -> Maybe Int -> Pos -> Bool
@@ -202,7 +202,7 @@ prop_update_updated sud value p = isSudoku updatedsud && getValue updatedsud p =
 
 -- TODO incorporate the 3x3 block into this
 candidates :: Sudoku -> Pos -> [Int]
-candidates s (x,y) = intersect (intersect (findCandidates (r !! y)) (findCandidates ((transpose r) !! x))) (findCandidates (findBlock s (x,y)))
+candidates s (y,x) = intersect (intersect (findCandidates (r !! y)) (findCandidates ((transpose r) !! x))) (findCandidates (findBlock s (y,x)))
   where r = rows s
 
 -- | Finds all possible value in a given block
@@ -212,7 +212,7 @@ findCandidates r = [ x | x <- [1..9], not (x `elem` xs) ]
 
 -- | Find the block that the given position is in
 findBlock :: Sudoku -> Pos -> Block
-findBlock s (x,y) = head (getThird (getThird (getBlocks s) y) x) --get the head as there should only be one item in the list
+findBlock s (y,x) = head (getThird (getThird (getBlocks s) y) x) --get the head as there should only be one item in the list
   where getThird :: [a] -> Int -> [a]
         getThird list index
           | index < 3 = a --take first third
@@ -221,7 +221,7 @@ findBlock s (x,y) = head (getThird (getThird (getBlocks s) y) x) --get the head 
           where (a,b,c) = splitInto3 list
 
 prop_candidates_correct :: Sudoku -> Bool
-prop_candidates_correct sud = and [  prop_candidates_correct' (candidates sud (x,y)) | (x,y) <- (blanks sud) ]
+prop_candidates_correct sud = and [  prop_candidates_correct' (candidates sud (y,x)) | (y,x) <- (blanks sud) ]
 
 prop_candidates_correct' :: [Int] -> Bool
 prop_candidates_correct' xs = l <= 9 && l == length (nub xs)
@@ -274,7 +274,7 @@ checkValues ((pos,value):xs) s
 
 -- | Return a list of all values in a sudoku which arent nothing with their respective positions
 getValuesLocations :: [[Maybe Int]] -> [(Pos,Maybe Int)]
-getValuesLocations rows = [ ((colNum,rowNum),value) | (rowNum, row) <- (zip [0.. ] rows), (colNum,value) <- (zip [0..] row), isJust value ]
+getValuesLocations rows = [ ((rowNum,colNum),value) | (rowNum, row) <- (zip [0.. ] rows), (colNum,value) <- (zip [0..] row), isJust value ]
 
 -- PART F4 ---------------------------------------------------------------------
 
