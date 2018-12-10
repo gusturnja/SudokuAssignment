@@ -221,14 +221,14 @@ findBlock s (y,x) = head (getThird (getThird (getBlocks s) y) x) --get the head 
           where (a,b,c) = splitInto3 list
 
 prop_candidates_correct :: Sudoku -> Bool
-prop_candidates_correct sud = and [ prop_candidates_correct' (candidates sud (y,x)) (y,x)
+prop_candidates_correct sud = and [ prop_candidates_correct' (candidates sud (y,x))
                                     (r!!y ++ (transpose r)!!x ++ (findBlock sud (y,x))) | (y,x) <- (blanks sud) ]
   where r     = rows sud
 
-prop_candidates_correct' :: [Int] -> Pos -> [Maybe Int] -> Bool
-prop_candidates_correct' []      _    _    = True -- If there's no candidates, then the test succeeds.
-prop_candidates_correct' (l:ls) (y,x) cells
-  | length (intersect cells [Just l]) == 0 = prop_candidates_correct' ls (y,x) cells -- If candidate works for given position, try the next one.
+prop_candidates_correct' :: [Int] -> [Maybe Int] -> Bool
+prop_candidates_correct' []      _         = True -- If there's no candidates, then the test succeeds.
+prop_candidates_correct' (l:ls) cells
+  | length (intersect cells [Just l]) == 0 = prop_candidates_correct' ls cells -- If candidate works for given position, try the next one.
   | otherwise                              = False -- If the candidate already exists in the block, row or column, then the test fails.
 
 -- PART F1 ---------------------------------------------------------------------
